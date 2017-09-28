@@ -9,12 +9,14 @@ static int out_flag;
 static int help_flag;
 static int verbose_flag;
 
+int c = 0;
+uint8_t data = 0;
+uint16_t key = 0;
+
+// OPTIONAL ARGUMENTS RECUIRE = SIGN TO WORK
+
 int main(int argc, char *argv[])
 {
-    int c = 0;
-    uint8_t *byte = 0;
-    uint16_t key = 0;
-
     static struct option long_options[] =
     {
         {"encrypt", required_argument, &encrypt_flag, 'e'},
@@ -28,28 +30,42 @@ int main(int argc, char *argv[])
         {0,         0,                 0,               0}
     };
 
-    while((c = getopt_long(argc, argv, "e:d:c:ko:thv", long_options, NULL)) != -1)
+    while((c = getopt_long(argc, argv, "e:d:c:k::o:thv", long_options, NULL)) != -1)
     {
+        printf("c = %c\noptarg = %s\n", c, optarg);
         switch(c)
         {
         case 'e':
             encrypt_flag = 1;
-            byte = optarg;
+            if(optarg != NULL)
+            {
+                char *end;
+                data = strtol(optarg, &end, 2);
+                printf("Data %d\n", data);
+            }
             break;
         case 'd':
             decrypt_flag = 1;
+            if(optarg != NULL)
+            {
+                char *end;
+                data = strtol(optarg, &end, 2);
+                printf("Data %d\n", data);
+            }
             break;
         case 'c':
             crack_flag = 1;
             break;
         case 'k':
             key_flag = 1;
-            uint8_t *byte = optarg;
-            //printf("key %c", byte[0]);
             if(optarg != NULL)
-                printf("key %c", *optarg);
-                //key = atoi(optarg);
-                //printf("key %c", *optarg);
+            {
+                char *end;
+                if(optarg[0] == '=')
+                    optarg[0] = '0';
+                key = strtol(optarg, &end, 2);
+                printf("key %d\n", key);
+            }
             break;
         case 'o':
             out_flag = 1;
@@ -68,7 +84,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    test(*byte, key);
+    //test(*byte, *key);
 
     if(help_flag)
     {
@@ -88,45 +104,57 @@ int main(int argc, char *argv[])
         exit(0);
     }
 
+    //test(data, key);
+
     if(triple_flag)
     {
         if(encrypt_flag)
         {
-            TripleSDES_Encrypt(byte);
+            TripleSDES_Encrypt(&data);
         }
         else if(decrypt_flag)
         {
-            TripleSDES_Decrypt(byte);
+            TripleSDES_Decrypt(&data);
         }
         else if(crack_flag)
         {
-            TripleSDES_Crack(byte);
+            TripleSDES_Crack(&data);
         }
     }
     else
     {
         if(encrypt_flag)
         {
-            SDES_Encrypt(byte, key);
+            SDES_Encrypt(&data, key);
         }
         else if(decrypt_flag)
         {
-            SDES_Decrypt(byte);
+            SDES_Decrypt(&data, key);
         }
         else if(crack_flag)
         {
-            SDES_Crack(byte);
+            SDES_Crack(&data);
         }
     }
     exit(0);
 }
 
-uint8_t SDES_Decrypt(uint8_t *byte)
+uint8_t SDES_Encrypt(uint8_t *byte, uint16_t key)
 {
-
+    uint8_t k1 = 0, k2 = 0, d = 0;
+    while(*byte != '\0')
+    {
+        k1 = LS_1(P10(key));
+        k2 = P8(LS_2(k1));
+        k1 = P8(k1);
+        d = IP_1(f_k(SW(f_k(IP(*byte), k1)), k2));
+        printf("%d ", d);
+        byte++;
+    }
+    printf("\n");
 }
 
-uint8_t SDES_Encrypt(uint8_t *byte, uint16_t key)
+uint8_t SDES_Decrypt(uint8_t *byte, uint16_t key)
 {
     uint8_t k1 = 0, k2 = 0, d = 0;
     while(*byte != '\0')
@@ -146,12 +174,12 @@ uint8_t SDES_Crack(uint8_t *byte)
 
 }
 
-uint8_t TripleSDES_Decrypt(uint8_t *byte)
+uint8_t TripleSDES_Encrypt(uint8_t *byte)
 {
 
 }
 
-uint8_t TripleSDES_Encrypt(uint8_t *byte)
+uint8_t TripleSDES_Decrypt(uint8_t *byte)
 {
 
 }
@@ -272,17 +300,17 @@ uint16_t permutate(uint16_t byte, uint8_t length, uint8_t indexLength, uint8_t *
 
 void test(uint8_t byte, uint8_t key)
 {
-    //printf("LS_2: %d = 2\n", LS_2(0x10));
-    //printf("LS_1: %d = 1\n", LS_1(0x10));
-    //printf("P4: %d = 3\n", P4(0x0A));
-    //printf("P8: %d = 164\n", P8(0x38));
-    //printf("P10: %d = 524\n", P10(0x282));
-    //printf("IP: %d = 184\n", IP(0xF0));
-    //printf("IP_1: %d = 27\n", IP_1(0x0F));
-    //printf("SW: %d = 240\n", SW(0x0F));
-    //printf("EP: %d = 195\n", EP(0x09));
-    //printf("S1: %d = 2\n", S1(0x0F));
-    //printf("S2: %d = 3\n", S2(0x0F));
-    //int8_t perm[] = {8,7,6,5,4,3,2,1};
-    //printf("permutate: %d = 15\n", permutate(0xF0, 8, 8, perm));
+    printf("LS_2: %d = 2\n", LS_2(0x10));
+    printf("LS_1: %d = 1\n", LS_1(0x10));
+    printf("P4: %d = 3\n", P4(0x0A));
+    printf("P8: %d = 164\n", P8(0x38));
+    printf("P10: %d = 524\n", P10(0x282));
+    printf("IP: %d = 184\n", IP(0xF0));
+    printf("IP_1: %d = 27\n", IP_1(0x0F));
+    printf("SW: %d = 240\n", SW(0x0F));
+    printf("EP: %d = 195\n", EP(0x09));
+    printf("S1: %d = 2\n", S1(0x0F));
+    printf("S2: %d = 3\n", S2(0x0F));
+    int8_t perm[] = {8,7,6,5,4,3,2,1};
+    printf("permutate: %d = 15\n", permutate(0xF0, 8, 8, perm));
 }
