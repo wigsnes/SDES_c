@@ -5,6 +5,7 @@ static int decrypt_flag;
 static int crack_flag;
 static int triple_flag;
 static int key_flag;
+static int key2_flag;
 static int out_flag;
 static int help_flag;
 static int verbose_flag;
@@ -12,6 +13,7 @@ static int verbose_flag;
 int c = 0;
 uint8_t data = 0;
 uint16_t key = 0;
+uint16_t key2 = 0;
 
 // OPTIONAL ARGUMENTS RECUIRE = SIGN TO WORK
 
@@ -24,13 +26,13 @@ int main(int argc, char *argv[])
         {"crack",   required_argument, &crack_flag,   'c'},
         {"key",     optional_argument, &key_flag,     'k'},
         {"out",     required_argument, &out_flag,     'o'},
-        {"triple",  no_argument,       &triple_flag,  't'},
+        {"key2",    optional_argument, &key2_flag,    'j'},
         {"help",    no_argument,       &help_flag,    'h'},
         {"verbose", no_argument,       &verbose_flag, 'v'},
         {0,         0,                 0,               0}
     };
 
-    while((c = getopt_long(argc, argv, "e:d:c:k::o:thv", long_options, NULL)) != -1)
+    while((c = getopt_long(argc, argv, "e:d:c:k::o:j::hv", long_options, NULL)) != -1)
     {
         printf("c = %c\noptarg = %s\n", c, optarg);
         switch(c)
@@ -66,12 +68,24 @@ int main(int argc, char *argv[])
                 key = strtol(optarg, &end, 2);
                 printf("key %d\n", key);
             }
+            if(key_flag & key2_flag)
+                triple_flag = 1;
+            break;
+        case 'j':
+            key2_flag = 1;
+            if(optarg != NULL)
+            {
+                char *end;
+                if(optarg[0] == '=')
+                    optarg[0] = '0';
+                key2 = strtol(optarg, &end, 2);
+                printf("key %d\n", key2);
+            }
+            if(key_flag & key2_flag)
+                triple_flag = 1;
             break;
         case 'o':
             out_flag = 1;
-            break;
-        case 't':
-            triple_flag = 1;
             break;
         case 'h':
             help_flag = 1;
@@ -110,11 +124,11 @@ int main(int argc, char *argv[])
     {
         if(encrypt_flag)
         {
-            TripleSDES_Encrypt(&data);
+            TripleSDES_Encrypt(&data, key, key2);
         }
         else if(decrypt_flag)
         {
-            TripleSDES_Decrypt(&data);
+            TripleSDES_Decrypt(&data, key, key2);
         }
         else if(crack_flag)
         {
@@ -141,47 +155,58 @@ int main(int argc, char *argv[])
 
 uint8_t SDES_Encrypt(uint8_t *byte, uint16_t key)
 {
-    uint8_t k1 = 0, k2 = 0, d = 0;
+    uint8_t k1 = 0, k2 = 0;
+    uint8_t *p;
+    uint8_t d[100];
+    p = d;
+    k1 = LS_1(P10(key));
+    k2 = P8(LS_2(k1));
+    k1 = P8(k1);
     while(*byte != '\0')
     {
-        k1 = LS_1(P10(key));
-        k2 = P8(LS_2(k1));
-        k1 = P8(k1);
-        d = IP_1(f_k(SW(f_k(IP(*byte), k1)), k2));
-        printf("%d ", d);
+        *p = IP_1(f_k(SW(f_k(IP(*byte), k1)), k2));
+        p++;
         byte++;
     }
-    printf("\n");
+    printf("%s\n", d);
+    return d;
 }
 
 uint8_t SDES_Decrypt(uint8_t *byte, uint16_t key)
 {
-    uint8_t k1 = 0, k2 = 0, d = 0;
+    uint8_t k1 = 0, k2 = 0;
+    uint8_t *p;
+    uint8_t d[100];
+    p = d;
+    k1 = LS_1(P10(key));
+    k2 = P8(LS_2(k1));
+    k1 = P8(k1);
     while(*byte != '\0')
     {
-        k1 = LS_1(P10(key));
-        k2 = P8(LS_2(k1));
-        k1 = P8(k1);
-        d = IP_1(f_k(SW(f_k(IP(*byte), k2)), k1));
-        printf("%d ", d);
+        *p = IP_1(f_k(SW(f_k(IP(*byte), k2)), k1));
+        p++;
         byte++;
     }
-    printf("\n");
+    printf("%s\n", d);
+    return d;
 }
 
 uint8_t SDES_Crack(uint8_t *byte)
 {
-
+    for(int i = 0;i < (1<<10);i++)
+    {
+        SDES_Decrypt(byte, i);
+    }
 }
 
-uint8_t TripleSDES_Encrypt(uint8_t *byte)
+uint8_t TripleSDES_Encrypt(uint8_t *byte, uint16_t key1, uint16_t key2)
 {
-
+    return SDES_Encrypt(SDES_Decrypt(SDES_Encrypt(byte, key1), key2), key1);
 }
 
-uint8_t TripleSDES_Decrypt(uint8_t *byte)
+uint8_t TripleSDES_Decrypt(uint8_t *byte, uint16_t key1, uint16_t key2)
 {
-
+    return SDES_Decrypt(SDES_Encrypt(SDES_Decrypt(byte, key1), key2), key1);
 }
 
 uint8_t TripleSDES_Crack(uint8_t *byte)
